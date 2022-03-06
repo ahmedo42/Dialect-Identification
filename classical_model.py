@@ -26,8 +26,8 @@ if __name__ == "__main__":
 
     clf = LinearSVC(random_state=RS, verbose=1,C=0.5)
     clf.fit(X_train, y_train)
-    
-    train_score = f1_score(y_train, clf.predict(X_val),average="macro")
+
+    train_score = f1_score(y_train, clf.predict(X_train),average="macro")
     validation_score = f1_score(y_val, clf.predict(X_val),average="macro")
     test_score = f1_score(y_test, clf.predict(X_test),average="macro")
 

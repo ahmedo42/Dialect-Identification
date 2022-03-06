@@ -7,7 +7,8 @@ import pytorch_lightning as pl
 
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification,AutoTokenizer
+from preprocessing import preprocess
 
 
 class DialectIDModel(pl.LightningModule):
