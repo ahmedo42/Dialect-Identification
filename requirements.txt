@@ -1,0 +1,16 @@
+pandas
+scikit-learn
+joblib
+pytorch-lightning 
+torchmetrics 
+gdown
+tqdm 
+boto3 
+requests 
+regex 
+sentencepiece 
+sacremoses 
+gdown 
+huggingface-hub 
+tokenizers 
+transformers
