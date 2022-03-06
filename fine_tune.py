@@ -8,16 +8,20 @@ import pytorch_lightning as pl
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForSequenceClassification,AutoTokenizer
+from torchmetrics import F1
 from preprocessing import preprocess
 
 
 class DialectIDModel(pl.LightningModule):
     def __init__(self):
         super().__init__()
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         n_classes = 18
         self.model = AutoModelForSequenceClassification.from_pretrained("UBC-NLP/MARBERT",num_labels=n_classes)
-        self.train_score = torchmetrics.F1Score(num_classes= n_classes,average="macro")
-        self.val_score =  torchmetrics.F1Score(num_classes= n_classes,average="macro")
+        self.train_score = F1(num_classes= n_classes,average="macro")
+        self.val_score =  F1(num_classes= n_classes,average="macro")
+        self.train_score.to(device)
+        self.val_score.to(device)
         
     def forward(self, input_ids, attention_mask):
         return self.model(input_ids, attention_mask)[0]
@@ -29,7 +33,7 @@ class DialectIDModel(pl.LightningModule):
         self.log("train_loss", loss)
         
         self.train_score(preds, labels)
-        self.log("train_score", self.train_score, prog_bar=True)
+        self.log("train_score", self.train_score,on_step=True, on_epoch=False)
         
         return loss
     
@@ -37,10 +41,10 @@ class DialectIDModel(pl.LightningModule):
         input_ids, attention_mask, labels = batch
         preds = self(input_ids, attention_mask)
         loss = F.cross_entropy(preds, labels)
-        self.log("val_loss", loss,prog_bar=True)
+        self.log("val_loss", loss)
         
         self.val_score(preds, labels)
-        self.log("val_score", self.val_score, prog_bar=True)
+        self.log("val_score", self.val_score,on_step=True, on_epoch=True)
         
         return loss
     
@@ -91,6 +95,7 @@ if __name__ == "__main__":
     model = DialectIDModel()
     callbacks = [
         pl.callbacks.ModelCheckpoint(monitor="val_score", dirpath='./checkpoint/', verbose=True, mode="max"),
+        pl.callbacks.ProgressBar(refresh_rate=20),
     ]
-    trainer = pl.Trainer(max_epochs=config['num_epochs'], callbacks=callbacks, gpus=1)    
+    trainer = pl.Trainer(max_epochs=config['num_epochs'], callbacks=callbacks, gpus=1,check_val_every_n_epoch=1)    
     trainer.fit(model, train_loader, val_loader)

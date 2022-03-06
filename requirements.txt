@@ -2,7 +2,7 @@ pandas
 scikit-learn
 joblib
 pytorch-lightning 
-torchmetrics 
+torchmetrics==0.6.2 
 gdown
 tqdm 
 boto3 
