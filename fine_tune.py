@@ -1,6 +1,8 @@
 import re
 import torchmetrics
 import torch
+import argparse
+
 
 import pandas as pd
 import pytorch_lightning as pl
@@ -9,20 +11,18 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForSequenceClassification,AutoTokenizer,get_linear_schedule_with_warmup,AdamW
 from torchmetrics import F1
-from preprocessing import preprocess
 
 
 class DialectIDModel(pl.LightningModule):
     def __init__(self,num_training_steps):
         super().__init__()
-        device = "cuda" if torch.cuda.is_available() else "cpu"
         n_classes = 18
         self.model = AutoModelForSequenceClassification.from_pretrained("UBC-NLP/MARBERT",num_labels=n_classes)
         self.num_training_steps = num_training_steps
         self.train_score = F1(num_classes= n_classes,average="macro")
         self.val_score =  F1(num_classes= n_classes,average="macro")
-        self.train_score.to(device)
-        self.val_score.to(device)
+        self.train_score.to(self.device)
+        self.val_score.to(self.device)
         
     def forward(self, input_ids, attention_mask):
         return self.model(input_ids, attention_mask)[0]
@@ -52,7 +52,7 @@ class DialectIDModel(pl.LightningModule):
     def configure_optimizers(self):
         warmup_proportion = 0.1
         num_warmup_steps = self.num_training_steps * warmup_proportion      
-        optimizer = AdamW(self.parameters(), lr=config["learning_rate"])
+        optimizer = AdamW(self.parameters(), lr=args.learning_rate)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=self.num_training_steps)
         scheduler_dict = {
             "scheduler":scheduler,
@@ -85,27 +85,37 @@ class MARBERTDataset(Dataset):
             label = self.df.loc[idx, "dialect"]
             return torch.tensor(encoded_input["input_ids"]), torch.tensor(encoded_input["attention_mask"]), torch.tensor(label, dtype=torch.int64)
 
+def main(args):
+    print(args)
+    pl.seed_everything(args.seed, workers=True)
+    train_dataset = MARBERTDataset("train.csv", args.max_seq_len)
+    val_dataset = MARBERTDataset("validation.csv",args.max_seq_len)
 
-if __name__ == "__main__":
-    config = {
-        'learning_rate': 5e-5,
-        'max_seq_len': 256,
-        'batch_size': 32,
-        'num_workers': 2,
-        'num_epochs': 3,
-    }
+    train_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, num_workers=args.num_workers)
+    val_loader = DataLoader(val_dataset, batch_size=args.train_batch_size*2, shuffle=False, num_workers=args.num_workers)
 
-    train_dataset = MARBERTDataset("train.csv", config["max_seq_len"])
-    val_dataset = MARBERTDataset("validation.csv",config["max_seq_len"])
-
-    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True, num_workers=config["num_workers"])
-    val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=False, num_workers=config["num_workers"])
-
-    num_training_steps = len(train_loader) * config["num_epochs"]
+    num_training_steps = len(train_loader) * args.num_epochs
     model = DialectIDModel(num_training_steps)
     callbacks = [
         pl.callbacks.ModelCheckpoint(monitor="val_score", dirpath='./checkpoint/', verbose=True, mode="max"),
         pl.callbacks.ProgressBar(refresh_rate=20),
     ]
-    trainer = pl.Trainer(max_epochs=config['num_epochs'], callbacks=callbacks, gpus=1,check_val_every_n_epoch=1, gradient_clip_val=1.0)    
+    trainer = pl.Trainer(max_epochs=args.num_epochs, callbacks=callbacks,accelerator="auto",check_val_every_n_epoch=1, gradient_clip_val=args.grad_clip,gpus=args.gpus,tpu_cores=args.tpu_cores)    
     trainer.fit(model, train_loader, val_loader)
+
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed",type=int,default=17)
+    parser.add_argument("--learning_rate",type=float,default=5e-5)
+    parser.add_argument("--train_batch_size",type=int,default=32)
+    parser.add_argument("--num_workers",type=int,default=4)
+    parser.add_argument("--num_epochs",type=int,default=3)
+    parser.add_argument("--max_seq_len",type=int,default=256)
+    parser.add_argument("--grad_clip",default=None)
+    parser.add_argument("--gpus",default=None)
+    parser.add_argument("--tpu_cores",default=None)
+
+    args = parser.parse_args()
+    main(args)
+ 
