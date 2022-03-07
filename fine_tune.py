@@ -7,17 +7,18 @@ import pytorch_lightning as pl
 
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoModelForSequenceClassification,AutoTokenizer
+from transformers import AutoModelForSequenceClassification,AutoTokenizer,get_linear_schedule_with_warmup,AdamW
 from torchmetrics import F1
 from preprocessing import preprocess
 
 
 class DialectIDModel(pl.LightningModule):
-    def __init__(self):
+    def __init__(self,num_training_steps):
         super().__init__()
         device = "cuda" if torch.cuda.is_available() else "cpu"
         n_classes = 18
         self.model = AutoModelForSequenceClassification.from_pretrained("UBC-NLP/MARBERT",num_labels=n_classes)
+        self.num_training_steps = num_training_steps
         self.train_score = F1(num_classes= n_classes,average="macro")
         self.val_score =  F1(num_classes= n_classes,average="macro")
         self.train_score.to(device)
@@ -33,7 +34,7 @@ class DialectIDModel(pl.LightningModule):
         self.log("train_loss", loss)
         
         self.train_score(preds, labels)
-        self.log("train_score", self.train_score,on_step=True, on_epoch=False)
+        self.log("train_score", self.train_score,on_step=True, on_epoch=False, prog_bar=True)
         
         return loss
     
@@ -44,12 +45,20 @@ class DialectIDModel(pl.LightningModule):
         self.log("val_loss", loss)
         
         self.val_score(preds, labels)
-        self.log("val_score", self.val_score,on_step=True, on_epoch=True)
+        self.log("val_score", self.val_score,on_step=True, on_epoch=True, prog_bar=True)
         
         return loss
     
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=config["learning_rate"])
+        warmup_proportion = 0.1
+        num_warmup_steps = self.num_training_steps * warmup_proportion      
+        optimizer = AdamW(self.parameters(), lr=config["learning_rate"])
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=self.num_training_steps)
+        scheduler_dict = {
+            "scheduler":scheduler,
+            "interval": "step",
+        }
+        return {"optimizer": optimizer, "lr_scheduler": scheduler_dict}
 
 
 
@@ -66,7 +75,6 @@ class MARBERTDataset(Dataset):
     
     def __getitem__(self, idx):
         text = self.df.loc[idx, "text"]
-        text = preprocess(text,bert=True)
         encoded_input = self.tokenizer.encode_plus(text, padding='max_length', max_length=self.max_seq_len, 
                                                    add_special_tokens=True, truncation='longest_first')
         
@@ -92,10 +100,12 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True, num_workers=config["num_workers"])
     val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=False, num_workers=config["num_workers"])
-    model = DialectIDModel()
+
+    num_training_steps = len(train_loader) * config["num_epochs"]
+    model = DialectIDModel(num_training_steps)
     callbacks = [
         pl.callbacks.ModelCheckpoint(monitor="val_score", dirpath='./checkpoint/', verbose=True, mode="max"),
         pl.callbacks.ProgressBar(refresh_rate=20),
     ]
-    trainer = pl.Trainer(max_epochs=config['num_epochs'], callbacks=callbacks, gpus=1,check_val_every_n_epoch=1)    
+    trainer = pl.Trainer(max_epochs=config['num_epochs'], callbacks=callbacks, gpus=1,check_val_every_n_epoch=1, gradient_clip_val=1.0)    
     trainer.fit(model, train_loader, val_loader)
