@@ -88,11 +88,11 @@ class MARBERTDataset(Dataset):
 
 if __name__ == "__main__":
     config = {
-        'learning_rate': 2e-6,
-        'max_seq_len': 128,
+        'learning_rate': 5e-5,
+        'max_seq_len': 256,
         'batch_size': 32,
         'num_workers': 2,
-        'num_epochs': 5,
+        'num_epochs': 3,
     }
 
     train_dataset = MARBERTDataset("train.csv", config["max_seq_len"])
