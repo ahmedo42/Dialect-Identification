@@ -74,7 +74,7 @@ class MARBERTDataset(Dataset):
     def __getitem__(self, idx):
         text = self.df.loc[idx, "text"]
         encoded_input = self.tokenizer.encode_plus(text, padding='max_length', max_length=self.max_seq_len, 
-                                                   add_special_tokens=True, truncation="True")
+                                                   add_special_tokens=True, truncation="longest_first")
         
         if self.test:
             return torch.tensor(encoded_input["input_ids"]), torch.tensor(encoded_input["attention_mask"])        

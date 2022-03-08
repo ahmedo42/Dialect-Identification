@@ -1,6 +1,6 @@
 pandas
-torch==1.8 
-torchtext==0.9.0
+torch
+torchtext
 scikit-learn
 joblib
 pytorch-lightning 
