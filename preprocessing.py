@@ -24,12 +24,10 @@ def normalize_mentions(text):
   mention_pattern = re.compile(r"/\B@\w+/g")
   return mention_pattern.sub(r"MENTION",text)
 
-def preprocess(text,bert=False):
+def preprocess(text):
     text = remove_punctuation(text)
     text = normalize_emoji(text)
     text = normalize_url(text)
     text = normalize_mentions(text)
-    if bert:
-        return text
     tokens = text.split()
     return ' '.join(tokens)

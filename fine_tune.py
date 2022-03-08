@@ -49,11 +49,9 @@ class DialectIDModel(pl.LightningModule):
         
         return loss
     
-    def configure_optimizers(self):
-        warmup_proportion = 0.1
-        num_warmup_steps = self.num_training_steps * warmup_proportion      
+    def configure_optimizers(self):     
         optimizer = AdamW(self.parameters(), lr=args.learning_rate)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=self.num_training_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=self.num_training_steps)
         scheduler_dict = {
             "scheduler":scheduler,
             "interval": "step",
@@ -76,7 +74,7 @@ class MARBERTDataset(Dataset):
     def __getitem__(self, idx):
         text = self.df.loc[idx, "text"]
         encoded_input = self.tokenizer.encode_plus(text, padding='max_length', max_length=self.max_seq_len, 
-                                                   add_special_tokens=True, truncation='longest_first')
+                                                   add_special_tokens=True, truncation="True")
         
         if self.test:
             return torch.tensor(encoded_input["input_ids"]), torch.tensor(encoded_input["attention_mask"])        
@@ -96,12 +94,14 @@ def main(args):
 
     num_training_steps = len(train_loader) * args.num_epochs
     model = DialectIDModel(num_training_steps)
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val_score", dirpath='./checkpoint/', verbose=True, mode="max")
     callbacks = [
-        pl.callbacks.ModelCheckpoint(monitor="val_score", dirpath='./checkpoint/', verbose=True, mode="max"),
+        checkpoint_callback,
         pl.callbacks.ProgressBar(refresh_rate=20),
     ]
     trainer = pl.Trainer(max_epochs=args.num_epochs, callbacks=callbacks,accelerator="auto",check_val_every_n_epoch=1, gradient_clip_val=args.grad_clip,gpus=args.gpus,tpu_cores=args.tpu_cores)    
     trainer.fit(model, train_loader, val_loader)
+    print(checkpoint_callback.best_model_path)
 
 if __name__ == "__main__":
     
