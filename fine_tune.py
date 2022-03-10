@@ -11,6 +11,8 @@ from torchmetrics import F1
 from transformers import (AdamW, AutoModelForSequenceClassification,
                           AutoTokenizer, get_linear_schedule_with_warmup)
 
+from preprocessing import preprocess
+
 
 class DialectIDModel(pl.LightningModule):
     def __init__(self, num_training_steps=0):
@@ -78,7 +80,7 @@ class MARBERTDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        text = self.df.loc[idx, "text"]
+        text = preprocess(self.df.loc[idx, "text"], bert=True)
         encoded_input = self.tokenizer.encode_plus(
             text,
             padding="max_length",

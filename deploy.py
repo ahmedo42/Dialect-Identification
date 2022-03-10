@@ -14,6 +14,7 @@ from pyngrok import ngrok
 from transformers import AutoTokenizer, logging
 
 from fine_tune import DialectIDModel
+from preprocessing import preprocess
 
 logging.set_verbosity_error()
 
@@ -44,6 +45,7 @@ class DLModel:
         self._setup()
 
     def predict(self, text):
+        text = preprocess(text, bert=True)
         encoded_input = self.tokenizer.encode_plus(
             text,
             padding="max_length",
@@ -56,7 +58,7 @@ class DLModel:
             input_ids = encoded_input["input_ids"]
             attention_mask = encoded_input["attention_mask"]
             confidence_scores = F.softmax(
-                self.model(input_ids=input_ids, attention_mask=attention_mask)
+                self.model(input_ids=input_ids, attention_mask=attention_mask), dim=1
             )
         confidence, predicted_class = torch.max(confidence_scores, dim=1)
         prediction = self._get_str_label(predicted_class.item())
@@ -98,6 +100,7 @@ class ClassicalModel:
         return -1
 
     def predict(self, text):
+        text = preprocess(text)
         features = self.tfidf.transform([text])
         confidence_scores = self.model.decision_function(features)[0]
         confidence = np.max(confidence_scores)
