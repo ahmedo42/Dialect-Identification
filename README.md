@@ -13,64 +13,58 @@ Training and deployment of Arabic DI models using [MARBERT](https://huggingface.
 
 ### Usage
 
-Install the requiremnts
+- Install the requiremnts
 ```
 pip install -r requirements.txt
 ```
-Fetch the labels 
+
+- Fetch the labels 
 
 ```
 python data_fetching.py
-```
 
-or  download the labeled dataset directly from google drive
+# or download the labeled dataset directly from google drive
 
-```
 gdown --id 1ir0WJRJQPBVihJ4fkc-ztewV84nyxtgt
 ```
 
-Split the dataset into training and validation sets (80/20 split)
+- Split the dataset into training and validation sets (80/20 split)
 
 ```
 python create_datasets.py
 ```
-Train the SVM model
+
+- Train the SVM model
 
 ```
 python classical_model.py
 ```
 
-Fine-Tune the MARBERT model
+- Fine-Tune the MARBERT model
 
 ```
 python fine_tune.py
 ```
 
-or download the weights both models , first upgrade gdown (to avoid permission error)
+- To download the weights both models
 
 ```
 pip install --upgrade --no-cache-dir gdown
-```
-
-then
-```
 gdown --id 1-NGYSdCjFU4-tWHwakKWYXUYOKK9ux8r # MARBERT checkpoint
 gdown --id 1-6JVk3-fR3Q0MGkYQstfMP8fqi090YBh # TFIDF trained features
 gdown --id 1yBHxGfRpn8XZswQuU4_7hAyOyjarn47t # Trained SVM model
 ```
 
-To deploy the models for inference , simply run
+- To deploy the models for inference , simply run
 
 ```
 python deploy.py
 ```
-To send requests for the server using `httpie` module for example , use `predict` for DL model , use `predict_classical` for SVM model
+- To send requests for the server using `httpie` module for example , use `predict` for DL model and  `predict_classical` for SVM model
 
 ```
-http POST {the_public_ngrok_url/predict} text=":D شوف بقي  اللي انت عايزه"
+http POST the_public_ngrok_url/predict text=":D شوف بقي  اللي انت عايزه"
 ```
-
-
 
 ### Refrences 
 - [QADI Paper](https://arxiv.org/pdf/2005.06557.pdf)
